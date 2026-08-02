@@ -1,4 +1,4 @@
-// Generated from quoted words in the original file.
+// Generated for wordle clones
 const WORDLEPLAY_ANSWERS = [
     "yaygı",
     "sunta",

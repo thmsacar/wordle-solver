@@ -1,0 +1,25 @@
+# Operating System Junk
+.DS_Store
+Thumbs.db
+*.swp
+
+# LaTeX Auxiliary & Build Files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.idx
+*.ind
+*.lof
+*.lot
+*.ilg
+
+# Temporary Scripts & Node Dependencies
+node_modules/
+scratch/
+*.tmp

@@ -1,0 +1,283 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\title{\textbf{Bilgi Teorisine Dayalı Türkçe Wordle Çözücü}}
+\author{\textbf{Thomas ACAR}}
+\date{Ağustos 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Bu doküman, \texttt{Wordle TR} kelime çözücüsünün arkasındaki matematiksel ilkeleri ve algoritmik tasarımı açıklamaktadır. 3Blue1Brown'un Bilgi Teorisi ile Wordle çözümü üzerine yayınladığı videodan esinlenerek, Türkçe Wordle oyunu için her aşamada en enformatif tahmini sunan bu çözücüyü geliştirdim. Bu açıklama metni, her seviyeden okuyucunun rahatça anlayabileceği şekilde tasarlanmıştır: Wordle'ın bir bilgi oyunu olarak nasıl çalıştığını açıklamakta, Bilgi Teorisi ve Shannon Entropisini adım adım örneklerle tanımlamakta ve tüm geçerli kelimeleri aramanın neden yalnızca kalan aday kelimeleri tahmin etmekten daha yüksek bilgi kazancı sağladığını göstermektedir.
+\end{abstract}
+
+\section{Giriş}
+Wordle görünürde 5 harfli basit bir kelime bulmaca oyunudur; ancak arka planda klasik bir \textbf{Bilgi Teorisi} problemidir. 3Blue1Brown'un entropi kavramını matematiksel olarak Wordle çözmek için nasıl kullandığını anlatan videosunu izledikten sonra, aynı yaklaşımı Türkçe Wordle için uygulamak istedim.
+
+Bu projenin temel amacı, her geçerli kelimeyi değerlendiren, o kelimenin getirmesi beklenen bilgi miktarını hesaplayan ve gizli hedef kelimeleri en hızlı şekilde eleyen hamleyi öneren hızlı, reaktif bir web uygulaması inşa etmekti.
+
+---
+
+\section{Bir Bilgi Oyunu Olarak Wordle'ı Anlamak}
+
+\subsection{Kurallar ve Geri Bildirim Sinyali}
+Wordle oyununda sistem iki ayrı kelime listesi kullanır:
+\begin{itemize}[itemsep=2pt]
+    \item \textbf{Muhtemel Cevaplar Sözlüğü ($\mathcal{A}$)}: Olası gizli hedef kelimelerden oluşan seçilmiş küme ($|\mathcal{A}| = 2936$ özgün kelime).
+    \item \textbf{Geçerli Tahmin Sözlüğü ($\mathcal{V}$)}: Tahmin olarak kabul edilen tüm geçerli kelimelerin bulunduğu geniş sözlük ($|\mathcal{V}| = 5500$ özgün kelime).
+\end{itemize}
+
+Her turda 5 harfli bir $g \in \mathcal{V}$ kelimesi tahmin edilir. Oyun buna karşılık 5 renkli kutucuktan oluşan bir geri bildirim örüntüsü ($p$) döndürür:
+\begin{itemize}[itemsep=3pt]
+    \item \textbf{Yeşil (2)}: Harf doğru ve tam olarak doğru konumda.
+    \item \textbf{Sarı (1)}: Harf gizli kelimede var, ancak farklı bir konumda.
+    \item \textbf{Gri (0)}: Harf gizli kelimede hiç yok (veya diğer konumda eşleşmiş).
+\end{itemize}
+
+5 kutucuğun her biri için 3 farklı renk seçeneği bulunduğundan, herhangi bir tahmin için en fazla $3^5 = 243$ olası renk kombinasyonu (ya da örüntüsü) mevcuttur.
+
+\subsection{\texorpdfstring{Aday Kelime Filtreleme ($\mathcal{C}_k$)}{Aday Kelime Filtreleme}}
+Oyunun başlangıcında (1. Tur), gizli kelime $\mathcal{A}$ kümesindeki 2.936 hedef kelimeden herhangi biri olabilir. Bu olası kelimeler kümesine \textbf{Aday Küme} ($\mathcal{C}_1 = \mathcal{A}$) diyoruz.
+
+İlk tahmininizi ($g_1 \in \mathcal{V}$) yapıp $p_1$ renk örüntüsünü aldığınızda, $\mathcal{C}_1$ içindeki bu örüntüyü üretmeyecek olan tüm kelimeleri elersiniz. Kalan geçerli hedef kelimeler daha küçük bir $\mathcal{C}_2$ aday kümesini oluşturur.
+
+$k$. turdaki amacınız, aday kümesini ($\mathcal{C}_k$) mümkün olan en hızlı şekilde tam olarak \textbf{1 kelimeye} indirmektir.
+
+---
+
+\section{İşin Arkasındaki Matematik: Bilgi Teorisi}
+
+\subsection{Bilgi Nedir?}
+Bir hayvanı tahmin etmek için ``20 Soru'' oyunu oynadığınızı hayal edin:
+\begin{itemize}[itemsep=2pt]
+    \item \textit{``Tuttuğun hayvan bir memeli mi?''} diye sormak kalan olasılıkları yaklaşık \%50/\%50 oranında böler. ``Evet'' veya ``Hayır'' yanıtı seçeneklerinizi yarı yarıya azaltır. Bu size büyük miktarda bilgi sağlar.
+    \item 1. soruda \textit{``Tuttuğun hayvan bir flamingo mu?''} diye sormak risklidir. Çok yüksek ihtimalle yanıt ``Hayır'' olacaktır ve bu yanıt neredeyse hiçbir seçeneği elemez.
+\end{itemize}
+
+Bilgi Teorisinde \textbf{bilgi, belirsizliğin azalma miktarıdır}. İyi bir hamle, oyun hangi yanıtı verirse versin, kalan olasılıklarda büyük bir azalmayı garanti eden hamledir.
+
+\subsection{\texorpdfstring{``Bit'' Nedir? ($\log_2$)}{Bit Nedir?}}
+Sıkıcı formüllere geçmeden önce, bir \textbf{bit}'in gerçekte ne anlama geldiğini ve 2 tabanındaki logaritmanın ($\log_2$) nereden doğduğunu net bir şekilde görselleştirelim.
+
+\begin{itemize}[leftmargin=1.5em, itemsep=12pt]
+    \item \textbf{Temel Birim: Tek Bir Evet/Hayır Sorusu} \\
+    En temel düzeyde \textbf{1 bit}, dengeli tek bir \textbf{Evet/Hayır sorusunun} yanıtını aldığınızda kazandığınız bilgi miktarıdır.
+    
+    1 ile 2 arasında bir sayı tuttuğumu düşünelim:
+    \begin{center}
+    \textit{``Tuttuğum sayı 1 mi?''}
+    \end{center}
+    İki seçenek de eşit olasılıktaysa, gelen yanıt (``Evet'' veya ``Hayır'') belirsizliğinizi anında tamamen çözer. Bu tek yanıt size \textbf{1 bitlik bilgi} kazandırır. 2 olasılığı 1'e indirir.
+
+    \item \textbf{Evet/Hayır Sorularını Üst Üste Koymak} \\
+    Arka arkaya birden fazla Evet/Hayır sorusu sorarsak ne olur?
+    \begin{itemize}[itemsep=3pt]
+        \item \textbf{1 Evet/Hayır Sorusu (1 bit)}: $2^1 = \textbf{2}$ olası durumu ayırt edebilir.
+        \item \textbf{2 Evet/Hayır Sorusu (2 bit)}: İlk soru alanı 2 gruba böler; ikinci soru bu grupları tekrar ikiye böler. Toplamda $2 \times 2 = 2^2 = \textbf{4}$ olası durumu ayırt eder.
+        \item \textbf{3 Evet/Hayır Sorusu (3 bit)}: $2 \times 2 \times 2 = 2^3 = \textbf{8}$ olası durumu ayırt eder.
+        \item \textbf{$b$ Evet/Hayır Sorusu ($b$ bit)}: $2^b$ olası durumu ayırt edebilir.
+    \end{itemize}
+    Örüntüyü fark ettiniz mi? Her eklenen 1 bitlik bilgi, eleyebileceğiniz veya ayırt edebileceğiniz olasılık sayısını \textbf{ikiye katlar}.
+
+    \item \textbf{Tersine Gitmek: $\log_2$ Nereden Geliyor?} \\
+    Şimdi soruyu tersten soralım. $b$ bitin kaç olasılığı yönettiğini sormak yerine, elinizde $N$ adet olasılık olduğunu bildiğinizi varsayalım:
+    \begin{center}
+    \textit{``$N$ seçenek arasından 1 tanesini bulmak için kaç adet Evet/Hayır sorusuna (bite) ihtiyacım var?''}
+    \end{center}
+    Çözmemiz gereken denklem şudur: $2^b = N$. Üs olan $b$'yi yalnız bırakmak için her iki tarafın 2 tabanında logaritmasını alırız:
+    \begin{equation}
+    b = \log_2(N)
+    \end{equation}
+    2 tabanındaki logaritma işte tam olarak budur! \textbf{$\log_2(N)$, $N$ adet seçenek arasından 1 tanesini yakalamak için sormanız gereken ideal Evet/Hayır soru sayısını sayar.}
+
+    \item \textbf{Bunu Wordle'a Uygulamak} \\
+    Türkçe Wordle oyunumuzda $N = 2936$ adet muhtemel cevap kelime ile başlarız. Gizli kelimeyi bulmak için toplam ne kadar bilgi toplamamız gerekir?
+    \begin{equation}
+    \text{Gerekli Toplam Bilgi} = \log_2(2936) \approx \textbf{11,52 bit}
+    \end{equation}
+    Bu durum, 2.936 aday arasından gizli kelimeyi bulmanın matematiksel olarak yaklaşık \textbf{11,52 adet ideal Evet/Hayır sorusunun} yanıtını almaya eşdeğer olduğu anlamına gelir. Wordle'da yaptığımız her tahmin, tek bir turda bu 11,52 bitin olabildiğince fazlasını toplamaya çalışan bir sorudur.
+\end{itemize}
+
+\subsection{Olasılık Kovaları}
+Kalan aday kelimelere ($\mathcal{C}_k \subseteq \mathcal{A}$) karşı bir $g \in \mathcal{V}$ tahminini test ettiğinizde, her aday kelime 243 olası renk örüntüsü ``kovasından'' birine düşer.
+
+Örneğin, 100 aday kelimenin kaldığını varsayalım:
+\begin{itemize}[itemsep=2pt]
+    \item Kova A (örüntü \texttt{02010}: 1 yeşil, 1 sarı, 3 gri) 50 kelime alır ($P = \frac{50}{100} = 0,50$).
+    \item Kova B (örüntü \texttt{22000}: 2 yeşil, 3 gri) 25 kelime alır ($P = \frac{25}{100} = 0,25$).
+    \item Kova C (örüntü \texttt{10202}: 2 yeşil, 1 sarı, 2 gri) 25 kelime alır ($P = \frac{25}{100} = 0,25$).
+\end{itemize}
+
+Bir $p$ örüntü kovası $N_p$ adet kelime içeriyorsa, o $p$ örüntüsünü almak şu miktarda bilgi sağlar:
+\begin{equation}
+I(p) = \log_2 \left( \frac{|\mathcal{C}_k|}{N_p} \right) = -\log_2 P(p) \quad \text{bit bilgi.}
+\end{equation}
+
+\textbf{Daha küçük kovaların daha fazla bit bilgi sağladığına} dikkat edin (eğer bir kovada sadece 1 kelime varsa, $I = \log_2(100/1) = 6,64$ bit olur ve anında kazanırsınız!).
+
+\subsection{\texorpdfstring{Shannon Entropisi ($H(g)$)}{Shannon Entropisi}}
+Wordle'a bir tahmin yazdığınızda, oyunun size tam olarak hangi renk örüntüsünü döndüreceğini önceden bilemezsiniz. Bir örüntü geride 50 aday bırakabilirken, başka bir örüntü sadece 2 aday bırakabilir.
+
+Bir tahmini oynamadan önce ne kadar iyi olduğunu değerlendirmek için, o tahminin sağlayacağı genel \textbf{beklenen bilgi kazancını} ölçecek bir yönteme ihtiyacımız vardır.
+
+\subsubsection*{Neden Ağırlıklı Ortalama?}
+Bir tahminin birden fazla olası sonucu varsa, o tahminin genel değeri, her bir sonuçtan elde edilen bilgi kazancının o sonucun gerçekleşme olasılığıyla ağırlıklandırılmış \textbf{ağırlıklı ortalamasıdır}:
+\begin{center}
+$\text{Beklenen Bilgi} = \sum (\text{Örüntü } p\text{'nin Olasılığı}) \times (\text{Örüntü } p\text{'den Kazanılan Bilgi})$
+\end{center}
+
+\subsubsection*{Formülde Neden Eksi İşareti ($-$) Var?}
+Bölüm 3.3'ten hatırlayacağınız üzere, $P(p)$ olasılığına sahip bir $p$ örüntüsünden kazanılan bilgi şöyle tanımlanır:
+\begin{equation}
+I(p) = \log_2 \left( \frac{1}{P(p)} \right) = -\log_2 P(p)
+\end{equation}
+
+$P(p)$ değeri $0$ ile $1$ arasında bir kesir olduğu için (örneğin $P(p) = 0,25$), logaritması $\log_2(0,25) = -2$ her zaman \textbf{negatif bir sayıdır}.
+
+Ancak bilgi, belirsizlikteki pozitif bir azalmayı temsil eder ($-2$ bit değil, $+2$ bit bilgi kazanırız). Negatif logaritmayı pozitif bir bilgi miktarına dönüştürmek için logaritmanın önüne bir \textbf{eksi işareti} ($-$) koyarız.
+
+\subsubsection*{Shannon Entropisi Formülü}
+Olasılık ağırlıklandırması olan $P(p)$ ile pozitif bilgi kazancı olan $-\log_2 P(p)$ birleştirildiğinde \textbf{Shannon Entropisinin} matematiksel tanımı elde edilir:
+
+\begin{equation}
+H(g \mid \mathcal{C}_k) = -\sum_{p} P(p) \log_2 P(p)
+\end{equation}
+
+Shannon Entropisi, $g$ tahminini oynamanın tüm olası renk örüntüleri genelinde sağlayacağı beklenen bilgiyi (bit cinsinden) temsil eder.
+
+\subsubsection*{Örnek Bir Hesaplama}
+Bölüm 3.3'teki 100 kelimelik örneğimizde olasılıklar $P = [0,50, 0,25, 0,25]$ idi:
+\begin{align*}
+H(g) &= - \left[ 0,50 \log_2(0,50) + 0,25 \log_2(0,25) + 0,25 \log_2(0,25) \right] \\
+&= - \left[ 0,50(-1) + 0,25(-2) + 0,25(-2) \right] \\
+&= 0,50 + 0,50 + 0,50 = \mathbf{1,50 \text{ bit}}
+\end{align*}
+
+Ortalamada $g$ tahminini oynamak, 100 kalan kelimeyi $\frac{100}{2^{1,50}} \approx 35$ kelimeye düşürecektir. Daha yüksek entropi değeri, daha iyi bir tahmin demektir.
+
+---
+
+\section{Neden Tüm Sözlüğü Aramak Sadece Muhtemel Cevapları Aramaktan İyidir?}
+
+Yaygın bir içgüdü, yalnızca gizli kelime olma ihtimali devam eden kelimeleri ($\mathcal{C}_k$) tahmin etmektir. Ancak \textbf{tüm geçerli tahmin sözlüğünü} ($\mathcal{V}$) aramak genellikle çok daha güçlü sonuçlar verir. Bunu aşağıdaki örnek üzerinde açıklayalım.
+
+\subsection{\texttt{\_AKER} Tuzak Örneği}
+4 aday kelimenin kaldığını varsayalım:
+$$\mathcal{C}_k = \{ \text{BAKER}, \text{FAKER}, \text{MAKER}, \text{TAKER} \}$$
+
+\begin{itemize}
+    \item \textbf{Adaylar Arasından Tahmin Yapmak} (örn. $g = \text{BAKER}$):
+    \begin{itemize}
+        \item \%25 doğru olma ihtimali (hepsi yeşil).
+        \item \%75 yanlış olma ihtimali (1 gri, 4 yeşil), geride 3 kelime bırakır.
+        \item Beklenen Entropi: \textbf{0,81 bit}.
+    \end{itemize}
+    \item \textbf{Tüm Sözlükten Tahmin Yapmak} (örn. $B, F, M, T$ harflerini içeren bir kelime):
+    \begin{itemize}
+        \item Aynı anda 4 harfi birden test eder. Her aday kelime benzersiz bir örüntü üretir (her biri \%25 olasılık).
+        \item Beklenen Entropi: \textbf{2,0 bit} ($\log_2(4) = 2,0$).
+        \item \textbf{Sonuç}: Bir sonraki turda gizli kelimeyi bulmayı \%100 kesinlikle garanti eder.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Aday Eşitlik Bonusu}
+Dışarıdan bir $g_{\text{ext}} \in \mathcal{V} \setminus \mathcal{C}_k$ kelimesi ile aday bir $g_{\text{cand}} \in \mathcal{C}_k$ kelimesi eşit entropi ürettiğinde, $g_{\text{cand}}$ kelimesine anında kazanma şansı bulunduğu için hafif bir öncelik veririz:
+\begin{equation}
+S(g) = H(g \mid \mathcal{C}_k) + \epsilon \cdot \mathbb{I}(g \in \mathcal{C}_k)
+\end{equation}
+burada $\epsilon = 0,0001$'dir.
+
+---
+
+\section{Algoritma Sözde Kodları}
+
+\begin{algorithm}[H]
+\caption{Geri Bildirim Örüntü Eşleştiricisi $f(g, w)$}
+\begin{algorithmic}[1]
+\State \textbf{Girdi:} Tahmin kelimesi $g$, Gizli aday $w$
+\State Örüntü dizisini ilklendir: $p \gets [0, 0, 0, 0, 0]$
+\State \Comment{\textbf{1. Aşama: Yeşilleri İşaretle (tam eşleşmeler)}}
+\For{$i \gets 0$ \textbf{to} $4$}
+    \If{$g[i] = w[i]$}
+        \State $p[i] \gets 2$; $g[i]$ ve $w[i]$ elemanlarını eşleşti olarak işaretle
+    \EndIf
+\EndFor
+\State \Comment{\textbf{2. Aşama: Sarıların İşaretlenmesi (kısmi eşleşmeler)}}
+\For{$i \gets 0$ \textbf{to} $4$}
+    \If{$g[i]$ eşleşmemiş \textbf{ve} $g[i] \in w$ (eşleşmemiş)}
+        \State $p[i] \gets 1$; $w$'deki eşleşen harfi işaretle
+    \EndIf
+\EndFor
+\State \Return $p_0 p_1 p_2 p_3 p_4$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{En Optimal Kelimeyi Bulucu $\text{findBestWord}(\mathcal{C}_k, \mathcal{V})$}
+\begin{algorithmic}[1]
+\State \textbf{Girdi:} Hedef Adaylar $\mathcal{C}_k \subseteq \mathcal{A}$, Geçerli Tahmin Sözlüğü $\mathcal{V}$
+\If{$|\mathcal{C}_k| \le 2$}
+    \State \Return $\arg\max_{g \in \mathcal{C}_k} H(g \mid \mathcal{C}_k)$
+\EndIf
+\State $S_{\max} \gets -1$, $g^* \gets \mathcal{C}_k[0]$, $H^* \gets 0$
+\For{\textbf{her} $g \in \mathcal{V}$}
+    \State Denklem (3)'ü kullanarak $H(g \mid \mathcal{C}_k)$ değerini hesapla
+    \State $S(g) \gets H(g \mid \mathcal{C}_k) + (\text{eğer } g \in \mathcal{C}_k \text{ ise } 0,0001 \text{ aksi halde } 0)$
+    \If{$S(g) > S_{\max}$}
+        \State $S_{\max} \gets S(g)$; $g^* \gets g$; $H^* \gets H(g \mid \mathcal{C}_k)$
+    \EndIf
+\EndFor
+\State \Return $\{ \text{kelime: } g^*, \text{entropi: } H^* \}$
+\end{algorithmic}
+\end{algorithm}
+
+---
+
+\section{Deneysel Sonuçlar: En İyi Türkçe Başlangıç Kelimeleri}
+
+$\mathcal{V}$ kümesindeki 5.500 geçerli tahmin kelimesinin tamamını $\mathcal{A}$ kümesindeki 2.936 hedef kelimeye karşı değerlendirmek en optimal başlangıç kelimelerini verir. Tablo~\ref{tab:top_starters}'de detaylandırıldığı üzere, \textbf{TARİK}, \textbf{MERAK} ve \textbf{KENAR} tüm veri kümesinde en yüksek bilgi kazancını elde ederek herhangi bir hedef kelimeyi ortalama sadece 3,58 turda çözmektedir.
+
+\begin{table}[ht]
+\centering
+\caption{En Optimal Türkçe Başlangıç Kelimeleri}
+\label{tab:top_starters}
+\vspace{4pt}
+\begin{tabular}{c c c c c}
+\toprule
+\textbf{Sıra} & \textbf{Kelime} & \textbf{Shannon Entropisi (Bit)} & \textbf{Ort. Tahmin ($\mathbb{E}[N]$)} & \textbf{Alan Daraltma} \\
+\midrule
+1 & \textbf{TARİK} & \textbf{5,8083} & \textbf{3,58 tur} & \textbf{\%97,1} ($2936 \to \approx 52$) \\
+2 & \textbf{MERAK} & \textbf{5,8057} & \textbf{3,58 tur} & \textbf{\%97,0} ($2936 \to \approx 53$) \\
+3 & \textbf{KENAR} & \textbf{5,7868} & \textbf{3,59 tur} & \textbf{\%97,0} ($2936 \to \approx 53$) \\
+4 & \textbf{SERAK} & 5,7801 & --- & \%96,9 \\
+5 & \textbf{KAMER} & 5,7785 & --- & \%96,9 \\
+6 & \textbf{KELAM} & 5,7379 & --- & \%96,5 \\
+7 & \textbf{KALEM} & 5,7162 & --- & \%96,4 \\
+8 & \textbf{TALİK} & 5,7081 & --- & \%96,4 \\
+9 & \textbf{KETAL} & 5,6973 & --- & \%96,3 \\
+10 & \textbf{KEMAL} & 5,6883 & --- & \%96,3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Sonuç}
+Bilgi Teorisi ve Shannon Entropisi maksimizasyonunu $\mathcal{V}$ tahmin sözlüğünün tamamı üzerinde kaldıraç olarak kullanan \texttt{Wordle TR} çözücüsü, binlerce olasılığı ortalama 3,6 turun altında tek bir gizli kelimeye indirmeyi başarmaktadır.
+
+\end{document}

@@ -133,7 +133,7 @@ body {
 body.light-mode { background: #ffffff; color: #111111; }
 body.light-mode .box { border-color: #cfcfcf; color: #111111; }
 body.light-mode .c0 { background: #b0b3b6; border-color: #9ca0a5; color: #ffffff; }
-body.light-mode .c1 { background: #f3c13a; border-color: #f3c13a; color: #111111; }
+body.light-mode .c1 { background: #f3c13a; border-color: #f3c13a; color: #ffffff; }
 body.light-mode .c2 { background: #6aaa64; border-color: #6aaa64; color: #ffffff; }
 body.light-mode .step-info-line,
 body.light-mode #info { color: #4b5563; }
